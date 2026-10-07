@@ -1,7 +1,9 @@
+import 'dotenv/config';
 import { createClient } from "@libsql/client";
 
 const db = createClient({
-    url: "file:local.db"
+    url: process.env.TURSO_DATABASE_URL || "file:local.db",
+    authToken: process.env.TURSO_AUTH_TOKEN
 });
 
 await db.execute(`
@@ -24,3 +26,6 @@ await db.execute(`
 `);
 
 console.log("Database created successfully");
+
+
+await db.close();

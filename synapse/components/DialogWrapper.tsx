@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
-import { addDatapoint } from "@/app/actions"
 import { Loader2 } from "lucide-react"
 import { useFormStatus } from "react-dom"
 import axios from "axios";
@@ -104,3 +103,4 @@ export default function DialogWrapper() {
         </Dialog>
     )
 }
+

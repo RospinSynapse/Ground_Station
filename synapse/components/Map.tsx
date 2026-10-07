@@ -1,17 +1,13 @@
 'use client'
 import 'leaflet/dist/leaflet.css'
-import { Polygon } from 'react-leaflet'
+import { Polygon, CircleMarker, Popup } from 'react-leaflet'
+import type { GroundSnapshot } from '@/lib/ground/store'
 import { MapContainer, TileLayer } from "react-leaflet";
-import { useEffect, useState } from 'react';
+
 import {Polygon as poly} from "@/lib/utils"
 
-export default function Map({ initialData }: { initialData: poly[] }) {
-    const [data, setData] = useState(initialData);
-
-    useEffect(() => {
-        console.log("initialData changed:", initialData);
-        setData(initialData);
-    }, [initialData]);
+export default function Map({ initialData, images }: { initialData: poly[]; images: GroundSnapshot["images"] }) {
+    const data = initialData;
 
     return (
         <MapContainer
@@ -24,6 +20,9 @@ export default function Map({ initialData }: { initialData: poly[] }) {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
+            {images.map(image => <CircleMarker key={`${image.missionId}:${image.imageId}`} center={[image.gps.latitude, image.gps.longitude]} radius={7} pathOptions={{ color: image.complete ? 'green' : 'orange' }}>
+                <Popup>{image.missionId} / {image.imageId}<br />{image.received}/2028 classified tiles<br />Photo GPS only; footprint unknown.</Popup>
+            </CircleMarker>)}
             {data.map((item, i) => {
                 let color;
                 switch (item.terrain){

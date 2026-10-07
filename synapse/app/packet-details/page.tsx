@@ -1,13 +1,13 @@
 "use client"
 import { useSearchParams } from 'next/navigation'
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Copy, Download } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 
-export default function PacketDetails() {
+function PacketDetails() {
     const searchParams = useSearchParams()
 
     const id = searchParams.get('id')
@@ -97,3 +97,5 @@ export default function PacketDetails() {
         </div>
     )
 }
+
+export default function Page() { return <Suspense fallback={<p>Loading packet…</p>}><PacketDetails /></Suspense>; }
