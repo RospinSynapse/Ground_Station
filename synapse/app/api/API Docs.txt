@@ -1,0 +1,10 @@
+API documentation:
+Packet types (/api/packet/~):
+    1) createMapPoint
+            Creates a new map point from a set of coords and a terrain type
+            Request body:
+                data:{
+                    lat: int
+                    long: int
+                    terrain: int(1-6)
+                }
