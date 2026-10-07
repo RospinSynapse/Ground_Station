@@ -1,6 +1,6 @@
 import { client } from '@/src/db';
 import { getGroundSnapshot, initializeGroundStore, PacketConflict, savePacket } from '@/lib/ground/store';
-import { MAX_LINE } from '@/lib/ground/protocol';
+import { MAX_LINE, InvalidPacket } from '@/lib/ground/protocol';
 import { ZodError } from 'zod';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,11 @@ export async function GET() {
 }
 export async function POST(request: Request) {
   // Local operator UI only: no cross-origin writes and no secrets exposed to the browser.
-  if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Same-origin request required' }, { status: 403 });
+  // Next may normalize request.url to localhost even when the browser uses 127.0.0.1.
+  // Compare against the original Host header, not a forwarded host supplied by a caller.
+  const url = new URL(request.url);
+  const expectedOrigin = `${url.protocol}//${request.headers.get('host') ?? url.host}`;
+  if (request.headers.get('origin') !== expectedOrigin) return Response.json({ error: 'Same-origin request required' }, { status: 403 });
   if (!request.headers.get('content-type')?.startsWith('application/json')) return Response.json({ error: 'JSON required' }, { status: 415 });
   const reader = request.body?.getReader();
   if (!reader) return Response.json({ error: 'Body required' }, { status: 400 });
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof PacketConflict) return Response.json({ error: error.message }, { status: 409 });
     if (error instanceof ZodError) return Response.json({ error: error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') }, { status: 400 });
-    if (error instanceof Error && /Fragment|Columns|label|padding/.test(error.message)) return Response.json({ error: error.message }, { status: 400 });
+    if (error instanceof InvalidPacket) return Response.json({ error: error.message }, { status: 400 });
     console.error(error); return Response.json({ error: 'Packet storage failed' }, { status: 503 });
   }
 }

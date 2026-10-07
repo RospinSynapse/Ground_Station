@@ -14,7 +14,7 @@ export default async function Home() {
     return (
         <div className="flex min-h-screen bg-zinc-50 font-sans dark:bg-black p-5">
             <div className="grid grid-cols-2 w-full gap-x-5 gap-y-5 auto-rows-min">
-                <GroundStation />
+                <GroundStation preview={process.env.SYNAPSE_PREVIEW === "1"} />
                 <div className="col-span-1">
                     <Card className="">
                         <CardHeader className="px-6 py-3 text-center">

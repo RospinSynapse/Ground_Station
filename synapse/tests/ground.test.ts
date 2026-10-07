@@ -33,7 +33,7 @@ test('framing handles split reads, CRLF, multiple lines and oversized input reco
   assert.deepEqual(decoder.push('ignored\n{}\n').lines, ['{}']);
 });
 test('classification reassembly handles reordered/duplicate fragments and missing tiles', () => {
-  const chunks = demoPackets().slice(1) as ClassificationPacket[];
+  const chunks = demoPackets().filter(p => p.type === 'classification') as ClassificationPacket[];
   assert.equal(assembleImage([...chunks].reverse()).received, 2028);
   assert.equal(assembleImage([...chunks, chunks[0]]).received, 2028);
   assert.equal(assembleImage(chunks.slice(1)).complete, false);

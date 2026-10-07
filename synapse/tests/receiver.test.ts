@@ -20,6 +20,8 @@ test('HTTP ingestion rejects bad input and preserves a valid packet through GET'
     assert.equal((await POST(request('x'.repeat(32769)))).status, 413);
     assert.equal((await POST(request(packet))).status, 201);
     assert.equal((await POST(request(packet))).status, 200);
+    const normalized = new Request('http://localhost:3000/api/ground', { method: 'POST', headers: { Origin: 'http://127.0.0.1:3000', Host: '127.0.0.1:3000', 'Content-Type': 'application/json' }, body: packet });
+    assert.equal((await POST(normalized)).status, 200);
     const result = await GET();
     assert.equal(result.status, 200);
     assert.equal((await result.json()).recent.length, 1);

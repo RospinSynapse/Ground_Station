@@ -1,4 +1,6 @@
-# Balloon link: first implementation
+# Balloon link: initial contract and compatibility
+
+**Updated requirements:** Read [NEW-REQUIREMENTS.md](NEW-REQUIREMENTS.md) for source-aware reception, variable image sizes, extrema, logs and additional modes. For the quickest demo, use [TRY-THE-PREVIEW.md](TRY-THE-PREVIEW.md). The 2,028-label size below is the original DDD default; newer packets can supply `totalSegments`.
 
 ## What works, and what still needs firmware
 
@@ -52,9 +54,9 @@ Every received packet includes:
 | Field | Meaning |
 | --- | --- |
 | `version` | Exactly `1` |
-| `type` | `telemetry`, `classification`, or `command_ack` |
+| `type` | `telemetry`, `classification`, `classification_point`, `gps_backup`, `system_log`, `state`, or `command_ack` |
 | `missionId` | Unique flight/session ID; reserve `demo-` for synthetic data |
-| `packetId` | Unique within a mission; retransmit unchanged content with the same ID |
+| `packetId` | Unique within a source and mission; retransmit unchanged content with the same ID |
 | `timestamp` | Sender UTC ISO timestamp, e.g. `2026-10-07T13:00:00Z` |
 | `radio` | Optional `{rssiDbm, snrDb}`; metadata, not proof of integrity |
 
@@ -93,7 +95,7 @@ IDs are 1–80 characters from letters, digits, `_ . : -`. Unknown fields, strin
 
 This describes labels `[0,1,9,2]` starting at segment zero. High nibble comes first. Fragment size is **1–128 labels**, with exactly `ceil(segmentCount/2)` bytes represented as hex. Odd counts require a zero low padding nibble. This size is a proposed USB chunk limit; the RF team must choose its own payload framing/overhead.
 
-Offsets index a fixed 2,028-label array. Fragments can arrive out of order. Identical overlaps are allowed; contradictory overlaps or different GPS/grid metadata for an image are rejected transactionally. Images are keyed by mission + image ID. All fragments of an image must agree on optional `columns`; it must divide 2,028. If omitted, the app stores ordered labels and shows progress but does not invent a grid. If supplied, order is row-major, left-to-right then top-to-bottom. The demo uses 52 × 39 solely as a demonstration. Class IDs remain 0–9 until the trained model's mapping is supplied.
+Offsets index `totalSegments` labels (2,028 when omitted for legacy compatibility). Fragments can arrive out of order. Identical overlaps are allowed; contradictory overlaps or different GPS/grid metadata for an image are rejected transactionally. Images are keyed by source + mission + image ID. All fragments of an image must agree on optional `columns`; it must divide the declared total. If omitted, the app stores ordered labels and shows progress but does not invent a grid. If supplied, order is row-major, left-to-right then top-to-bottom. The demo uses 52 × 39 solely as a demonstration. Class IDs remain 0–9 until the trained model's mapping is supplied.
 
 ### Command and acknowledgement examples
 
@@ -109,7 +111,7 @@ Ground bridge relays a balloon response:
 {"version":1,"type":"command_ack","missionId":"flight-001","packetId":"ack-001","timestamp":"2026-10-07T13:00:01Z","commandId":"cmd-001","status":"executed","message":"Entered safe mode"}
 ```
 
-Proposed modes: `init`, `nominal`, `low_power`, `safe`, `recovery`. Proposed ACK status: `accepted`, `executed`, `rejected`. A USB write is not an RF ACK. Commands are never sent on connect or retried automatically. The operator must enable the experimental control and enter the target mission. The outgoing command display is session-local; incoming ACKs are stored. This is not a durable command queue, RF authentication system, or mission-certified command system. Late ACKs outside the most recent 100 packets remain in the DB but may no longer appear in the live correlation view.
+Proposed modes: `init`, `nominal`, `photo`, `processing`, `transmission`, `low_power`, `safe`, `recovery`. Proposed ACK status: `accepted`, `executed`, `rejected`. A USB write is not an RF ACK. Commands are never sent on connect or retried automatically. The operator must enable the experimental control and enter the target mission. The outgoing command display is session-local; incoming ACKs are stored. This is not a durable command queue, RF authentication system, or mission-certified command system. Late ACKs outside the most recent 100 packets remain in the DB but may no longer appear in the live correlation view.
 
 ## Run it (no TypeScript knowledge needed)
 
@@ -126,7 +128,7 @@ Open `http://localhost:3000`. Use desktop Chrome or Edge for serial reception. W
 
 Click **Load demo packets** first. You should see a DEMO telemetry record and a completed 2,028-tile image. The demo is saved with a new `demo-...` mission ID each time and can become the latest telemetry shown; it never claims to be live data. Do not run demos during operational acquisition. Afterward connect the ground ESP32 with matching bridge firmware.
 
-No `.env` is needed for local use: database defaults to `file:local.db`. If using an existing database, keep its `TURSO_DATABASE_URL` and optional `TURSO_AUTH_TOKEN` in `synapse/.env`; the initializer creates missing legacy tables without deleting existing data. The new `flight_packets` table and index initialize on first API use, also without dropping existing tables. It stores original validated JSON rather than flattening unknown OBC/Pi parameters.
+No `.env` is needed for local use: database defaults to `file:local.db`. If using an existing database, keep its `TURSO_DATABASE_URL` and optional `TURSO_AUTH_TOKEN` in `synapse/.env`; the initializer creates missing legacy tables without deleting existing data. The new `received_packets` table and index initialize on first API use, also without dropping existing tables. It stores original validated JSON rather than flattening unknown OBC/Pi parameters.
 
 The dev/start scripts bind to loopback because the existing manual-data APIs and new receiver API are for a local operator, not a public service. No user authentication is added here. Do not expose the app publicly without designing access control. The receiver POST checks same-origin requests. Map tiles still require internet; packet reception/storage does not require a remote server when using local SQLite.
 

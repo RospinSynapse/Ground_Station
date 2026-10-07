@@ -1,5 +1,9 @@
 # SYNAPSE ground station
 
+[Try the isolated preview first](docs/TRY-THE-PREVIEW.md): `npm run preview`, then open http://localhost:3030 and load demo packets.
+
+[Spreadsheet and GS-design additions](docs/NEW-REQUIREMENTS.md).
+
 The TypeScript / Next.js application is this `synapse/` directory. Run commands here, not in the outer Vite starter.
 
 ```sh
