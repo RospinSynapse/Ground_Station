@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { WifiLink, type GatewayStatus } from '@/lib/ground/wifi';
 import { SerialLink } from '@/lib/ground/serial';
 import { commandSchema, parsePacket, MODES, SOURCE_NAMES } from '@/lib/ground/protocol';
 import type { GroundSnapshot } from '@/lib/ground/store';
@@ -10,9 +11,13 @@ import { Button } from '@/components/ui/button';
 
 export const CLASS_COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe'];
 export default function GroundStation({ preview = false }: { preview?: boolean }) {
-  const link = useRef<SerialLink | null>(null);
+  const link = useRef<SerialLink | WifiLink | null>(null);
   const [connection, setConnection] = useState('Disconnected');
   const [baud, setBaud] = useState(115200);
+  const [transport, setTransport] = useState('wifi');
+  const [address, setAddress] = useState('ws://192.168.4.1:81/');
+  const [token, setToken] = useState('');
+  const [gateway, setGateway] = useState<GatewayStatus | null>(null);
   const [snapshot, setSnapshot] = useState<GroundSnapshot | null>(null);
   const [error, setError] = useState('');
   const [events, setEvents] = useState<string[]>([]);
@@ -49,12 +54,20 @@ export default function GroundStation({ preview = false }: { preview?: boolean }
     log(`${result.duplicate ? 'Duplicate' : 'Stored'} ${packet.type}: ${packet.packetId}`);
   }
   async function connect() {
-    setConnection('Connecting');
-    const serial = new SerialLink(); link.current = serial;
+    setConnection('Connecting'); setGateway(null);
+    const onClose = () => { setConnection('Disconnected'); setEnabled(false); setGateway(null); };
+    const onError = (message: string) => log(`ERROR: ${message}`);
+    const onLine = async (line: string) => ingest(JSON.parse(line));
     try {
-      await serial.connect(baud, async line => ingest(JSON.parse(line)), message => log(`ERROR: ${message}`), () => { setConnection('Disconnected'); setEnabled(false); });
+      if (transport === 'wifi') {
+        const wifi = new WifiLink(); link.current = wifi;
+        await wifi.connect(address, token, onLine, onError, onClose, setGateway);
+      } else {
+        const serial = new SerialLink(); link.current = serial;
+        await serial.connect(baud, onLine, onError, onClose);
+      }
       setConnection('Connected');
-    } catch (e) { log((e as Error).message); setConnection('Disconnected'); }
+    } catch (e) { log((e as Error).message); await link.current?.disconnect(); onClose(); }
   }
   async function runDemo() {
     setDemo(true);
@@ -67,26 +80,28 @@ export default function GroundStation({ preview = false }: { preview?: boolean }
     setSending(true);
     try {
       const value = commandSchema.parse({ version: 1, type: commandType, missionId, commandId: crypto.randomUUID(), timestamp: new Date().toISOString(), ...(commandType === 'set_mode' ? { mode } : { target }) });
-      if (!link.current) throw new Error('No serial connection');
+      if (!link.current) throw new Error('No ground receiver connection');
       await link.current.send(value);
-      setCommand({ id: value.commandId, mission: value.missionId, message: 'Written to USB; awaiting balloon acknowledgement. No automatic retry.' });
+      setCommand({ id: value.commandId, mission: value.missionId, message: 'Submitted to the ground receiver; awaiting balloon acknowledgement. No automatic retry.' });
       log(`TX ${value.type}: ${value.commandId}`);
     } catch (e) { log((e as Error).message); }
     finally { setSending(false); }
   }
   const telemetry = snapshot?.latestTelemetry;
-  const ack = snapshot?.recent.find(r => r.packet.type === 'command_ack' && r.packet.commandId === command?.id && r.packet.missionId === command?.mission)?.packet;
+  const ack = snapshot?.recent.find(r => (r.source === 'main_lora' || r.source === 'wired') && r.packet.type === 'command_ack' && r.packet.commandId === command?.id && r.packet.missionId === command?.mission)?.packet;
   return <section className="space-y-4 rounded-xl border p-5 col-span-2" aria-label="Ground station connection">
     <h2 className="text-xl font-semibold">SYNAPSE — Balloon link and received data</h2>
     {preview && <p className="rounded border border-amber-500 bg-amber-100 text-black p-3"><strong>PREVIEW MODE</strong> — separate preview.db database. Radio commands are disabled. Click Load demo packets to explore.</p>}
-    <p>Proposed USB bridge v1 — flight firmware must implement this contract. USB connected does not mean the radio link is working.</p>
+    <p>Balloon → LoRa radio → ground receiver → Wi-Fi or local USB → laptop. No cable runs to the balloon. Receiver connection and balloon reception are separate statuses.</p>
     <div className="flex flex-wrap gap-3 items-center">
-      <label>USB baud rate <select value={baud} disabled={connection !== 'Disconnected'} onChange={e => setBaud(Number(e.target.value))}>{[9600, 57600, 115200, 230400].map(n => <option key={n}>{n}</option>)}</select></label>
-      <Button onClick={connect} disabled={connection !== 'Disconnected' || demo}>Connect ESP32</Button>
+      <label>Ground receiver connection <select value={transport} disabled={connection !== 'Disconnected'} onChange={e => setTransport(e.target.value)}><option value="wifi">Wi-Fi</option><option value="usb">USB to ground receiver</option></select></label>
+      {transport === 'wifi' ? <><label>Receiver address <input className="border p-1" value={address} disabled={connection !== 'Disconnected'} onChange={e => setAddress(e.target.value)} /></label><label>Gateway token <input className="border p-1" type="password" autoComplete="off" value={token} disabled={connection !== 'Disconnected'} onChange={e => setToken(e.target.value)} /></label></> : <label>USB baud rate <select value={baud} disabled={connection !== 'Disconnected'} onChange={e => setBaud(Number(e.target.value))}>{[9600, 57600, 115200, 230400].map(n => <option key={n}>{n}</option>)}</select></label>}
+      <Button onClick={connect} disabled={connection !== 'Disconnected' || demo}>Connect ground receiver</Button>
       <Button variant="outline" disabled={connection !== 'Connected'} onClick={async () => { setConnection('Disconnecting'); await link.current?.disconnect(); }}>Disconnect</Button>
-      <span role="status">USB: {connection}</span>
+      <span role="status">Ground receiver: {connection}</span>
       <Button variant="secondary" disabled={demo || connection !== 'Disconnected'} onClick={runDemo}>{demo ? 'Loading…' : 'Load demo packets (saved as demo)'}</Button>
     </div>
+    {gateway && <p>Ground LoRa radio: {gateway.radioReady ? 'Initialized' : 'Unavailable'} • received radio messages: {gateway.receivedPackets} • last RSSI: {gateway.lastRssi ?? 'none'} dBm. This is receiver status, not confirmation of a live balloon.</p>}
     <BackupReceivers snapshot={snapshot} ingest={ingest} />
     <OperationsReference />
     {error && <p role="alert" className="text-red-600">{error}</p>}
@@ -107,7 +122,7 @@ export default function GroundStation({ preview = false }: { preview?: boolean }
         <label>Mission ID <input className="border p-1" value={missionId} onChange={e => setMissionId(e.target.value)} /></label>
         <label>Command <select value={commandType} onChange={e => setCommandType(e.target.value)}><option value="set_mode">Change operational mode</option><option value="request_data">Request data (proposed)</option></select></label>
         {commandType === 'set_mode' ? <label>Mode <select value={mode} onChange={e => setMode(e.target.value)}>{MODES.map(m => <option key={m}>{m}</option>)}</select></label> : <label>Data <select value={target} onChange={e => setTarget(e.target.value)}>{['telemetry', 'classification', 'status', 'critical_logs'].map(t => <option key={t}>{t}</option>)}</select></label>}
-        <Button disabled={preview || !enabled || connection !== 'Connected' || !missionId || sending} onClick={sendCommand}>Send command</Button>
+        <Button disabled={preview || !enabled || connection !== 'Connected' || (transport === 'wifi' && !gateway?.radioReady) || !missionId || sending} onClick={sendCommand}>Send command</Button>
       </div>
       {command && <p>Command {command.id}: {ack?.type === 'command_ack' ? `${ack.status}: ${ack.message}` : command.message}</p>}
     </details>

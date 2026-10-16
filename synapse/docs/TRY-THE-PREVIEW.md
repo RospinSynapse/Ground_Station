@@ -26,6 +26,8 @@ The first setup needs internet to install packages. Radio hardware is not needed
 - A clearly synthetic critical event and a reported transmission/descent state.
 - An expandable spreadsheet reference showing phase schedules and operational modes.
 - A packet log and a normalized JSON/JSONL import control.
+- The original Pachete table now includes incoming receiver packets.
+- A Wi-Fi/USB ground receiver selector; no physical receiver is simulated by the demo.
 
 `preview.db` is separate from `local.db` or your Turso database; the launcher deliberately overrides database configuration only for its own child processes. It does not edit your `.env`. All demo packets use `demo-...` mission IDs. Map tiles require internet; a tile-loading failure does not stop packet storage.
 

@@ -1,5 +1,7 @@
 # Balloon link: initial contract and compatibility
 
+**Wireless update:** A Wi-Fi ground-gateway client and paired reference LoRa bridge firmware are now provided. See [firmware setup](../../firmware/README.md). USB in this document means a cable to the ground receiver, never to the airborne balloon. The radio framing and OBC UART contract in the firmware guide supersede the earlier statement that no firmware is included.
+
 **Updated requirements:** Read [NEW-REQUIREMENTS.md](NEW-REQUIREMENTS.md) for source-aware reception, variable image sizes, extrema, logs and additional modes. For the quickest demo, use [TRY-THE-PREVIEW.md](TRY-THE-PREVIEW.md). The 2,028-label size below is the original DDD default; newer packets can supply `totalSegments`.
 
 ## What works, and what still needs firmware
