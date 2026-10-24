@@ -153,3 +153,6 @@ body {
         @apply bg-background text-foreground;
     }
 }
+
+/* Local fallbacks keep ground-station builds independent of Google Fonts. */
+:root { --font-geist-sans: Arial, Helvetica, sans-serif; --font-geist-mono: Consolas, monospace; }
